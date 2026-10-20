@@ -49,14 +49,14 @@ tr.cur td{background:#e8b92326!important;font-weight:700}
 .card .v.sm{font-size:20px}
 </style></head><body>
 <div id="gate"><form onsubmit="go(event)"><h1>NNN Tracker</h1><p class="muted">Enter password</p><input id="pw" type="password" autofocus><button>Open</button><div id="err" class="neg"></div></form></div>
-<div class="top"><div class="wrap"><h1>NNN Tracker</h1><div class="muted">Parma Gas Station · Popeyes Orange City · <span id="gen"></span></div></div></div>
+<div class="top"><div class="wrap"><h1>NNN Tracker</h1><div class="muted">Parma Gas Station · Popeyes Orange City · 5 Ross Ct Greensboro · <span id="gen"></span></div></div></div>
 <div class="wrap" id="app" style="display:none">
-<div class="pills" id="tabs" style="margin-top:16px"><button class="pill" data-t="all">All</button><button class="pill" data-t="parma">Parma Gas Station</button><button class="pill" data-t="popeyes">Popeyes Orange City</button></div>
+<div class="pills" id="tabs" style="margin-top:16px"><button class="pill" data-t="all">All</button><button class="pill" data-t="parma">Parma Gas Station</button><button class="pill" data-t="popeyes">Popeyes Orange City</button><button class="pill" data-t="ross">5 Ross Ct Greensboro</button></div>
 <section data-s="A"><div class="cards" id="hero"></div><h2>Properties</h2><div class="cards" id="pcards"></div>
 <div class="grid2"><div><h2>Rent by Year</h2><div class="chartbox" id="cHist"></div></div><div><h2>Contract Rent to Lease End</h2><div class="chartbox" id="cProj"></div></div></div>
 <h2>Summary</h2><div class="scroll" id="tSum"></div>
-<h2>Rent, Mortgage &amp; Net by Year</h2><div class="scroll" id="tHist"></div>
-<h2>Contract Rent, Mortgage &amp; Net to Lease End</h2><div class="scroll" id="tProj"></div>
+<h2>Rent, Mortgage / Expenses &amp; Net by Year</h2><div class="scroll" id="tHist"></div>
+<h2>Contract Rent, Mortgage / Expenses &amp; Net to Lease End</h2><div class="scroll" id="tProj"></div>
 <h2>Deposits Received</h2><div class="scroll" id="tDepA"></div></section>
 <section data-s="P"><div class="info" id="pinfo"></div><div class="cards" id="pc"></div>
 <h2>Escalation Schedule</h2><div class="chartbox" id="cSch"></div><div class="scroll" style="margin-top:12px" id="tSch"></div>
@@ -69,7 +69,8 @@ async function decrypt(pw){const e=await (await fetch('data.enc.json',{cache:'no
  const key=await crypto.subtle.deriveKey({name:'PBKDF2',salt:b64(e.salt),iterations:e.iter,hash:'SHA-256'},km,{name:'AES-GCM',length:256},false,['decrypt']);
  return JSON.parse(new TextDecoder().decode(await crypto.subtle.decrypt({name:'AES-GCM',iv:b64(e.iv)},key,b64(e.ct))));}
 const MO=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-const COL={parma:'#e8b923',popeyes:'#f97316'};
+const COL={parma:'#e8b923',popeyes:'#f97316',ross:'#38bdf8'};
+const ESC=p=>p.pct?p.pct+'% every '+p.esc.replace(/^every /i,''):'Unknown';const CL=p=>p.clbl||'mortgage';
 const RM=matchMedia('(prefers-reduced-motion: reduce)').matches;
 const r2=v=>Math.round(v*100)/100;
 const $=v=>v==null||!isFinite(v)?'—':(v<0?'-':'')+'$'+Math.abs(v).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2});
@@ -98,36 +99,36 @@ function stacked(id,groups,keys,colors,names){const W=900,Hh=260,P=46;let mx=0,m
  setTimeout(()=>document.querySelectorAll('#'+id+' rect').forEach(r=>{r.setAttribute('y',r.dataset.y);r.setAttribute('height',r.dataset.h)}),RM?0:250);}
 function card(l,v,s,extra,hero,raw){return `<div class="card${hero?' hero':''}"><div class="l">${l}</div><div class="v ${raw?'sm':sg(v)}">${raw?v:$(v)}</div>${s?`<div class="s">${s}</div>`:''}${extra||''}</div>`}
 function bar(p,c){return `<div class="bar"><i data-w="${Math.max(0,Math.min(100,p))}" style="background:${c}"></i></div>`}
-const nxtTxt=p=>p.next?`+${p.pct}% on ${fd(p.next.date)} → ${$(p.next.monthly)}/mo`:'Final lease year';
+const nxtTxt=p=>!p.pct?'Escalation unknown':p.next?`+${p.pct}% on ${fd(p.next.date)} → ${$(p.next.monthly)}/mo`:'Final lease year';
 function all(){const K=D.keys,P=D.props,T=D.tot,nm=Object.fromEntries(K.map(k=>[k,P[k].name]));
  const firstDep=K.map(k=>P[k].depFirst).filter(Boolean).sort()[0];
  document.getElementById('hero').innerHTML=card('Combined monthly rent',T.monthly,`${$(T.annual)} per year`,'',1)+card('Combined annual rent',T.annual,`${T.yoc}% yield on ${$(T.price)} cost`,'',1)
-  +card('Mortgage / debt service',-T.mort,`${$(-T.mortAnn)} per year · Popeyes only`)+card('Net cash flow / month',T.net,`${$(T.netAnn)} per year after mortgage`,'',1)
-  +card('Projected Annual Net Income',r2(T.net*12),`${$(T.net)}/mo net after mortgage`,'',1)+card('Deposits received',T.received,'Since '+fd(firstDep))+card('Remaining lease value',T.remaining,'Contract rent from next month to lease end')+card('Rent by year, all years',T.allIncome,D.years[0]+'–'+D.years[D.years.length-1]);
- document.getElementById('pcards').innerHTML=K.map(k=>{const p=P[k];return card(`<span class="dot" style="background:${COL[k]}"></span>${p.name}`,p.monthly,`${p.mort?`Mortgage ${$(-p.mort)}/mo · Net ${$(p.net)}/mo (${$(p.netAnn)}/yr)`:'No debt · Net = rent'} · ${$(p.annual)}/yr gross · ${p.yearsLeft} yrs left · ${nxtTxt(p)}`,bar(p.elapsed,COL[k]))}).join('');
+  +card('Mortgage / expenses',-T.mort,`${$(-T.mortAnn)} per year · Popeyes mortgage + Ross Ct expenses`)+card('Net cash flow / month',T.net,`${$(T.netAnn)} per year after mortgage & expenses`,'',1)
+  +card('Projected Annual Net Income',r2(T.net*12),`${$(T.net)}/mo net after mortgage & expenses`,'',1)+card('Deposits received',T.received,'Since '+fd(firstDep))+card('Remaining lease value',T.remaining,'Contract rent from next month to lease end · excludes Ross Ct (term unknown)')+card('Rent by year, all years',T.allIncome,D.years[0]+'–'+D.years[D.years.length-1]);
+ document.getElementById('pcards').innerHTML=K.map(k=>{const p=P[k];return card(`<span class="dot" style="background:${COL[k]}"></span>${p.name}`,p.monthly,`${p.mort?`${CL(p)=='expenses'?'No debt · Expenses':'Mortgage'} ${$(-p.mort)}/mo · Net ${$(p.net)}/mo (${$(p.netAnn)}/yr)`:'No debt · Net = rent'} · ${$(p.annual)}/yr gross · ${p.yearsLeft==null?'term unknown':p.yearsLeft+' yrs left'} · ${nxtTxt(p)}`,bar(p.elapsed,COL[k]))}).join('');
  stacked('cHist',D.years.map(Y=>({label:Y,vals:Object.fromEntries(K.map(k=>[k,P[k].byYear[Y]]))})),K,COL,nm);
  stacked('cProj',D.pyears.map(Y=>({label:Y,vals:Object.fromEntries(K.map(k=>[k,P[k].contractYear[Y]]))})),K,COL,nm);
- tbl('tSum',['Property','Tenant','Monthly rent','Mortgage / mo','Net cash flow / mo','Annual rent','Mortgage / yr','Net cash flow / yr','Escalation','Next escalation','Next monthly rent','Lease end','Years left','Deposits received','Remaining lease value'],
-  K.map(k=>{const p=P[k];return [`<span class="dot" style="background:${COL[k]}"></span>${p.name}`,p.tenant,M(p.monthly),M(-p.mort),M(p.net),M(p.annual),M(-p.mortAnn),M(p.netAnn),{v:p.pct+'% every '+p.esc.replace(/^every /i,''),d:p.pct},D8(p.next&&p.next.date),M(p.next&&p.next.monthly),D8(p.leaseEnd),N(p.yearsLeft),M(p.received),M(p.remaining)]}),
+ tbl('tSum',['Property','Tenant','Monthly rent','Mortgage / expenses / mo','Net cash flow / mo','Annual rent','Mortgage / expenses / yr','Net cash flow / yr','Escalation','Next escalation','Next monthly rent','Lease end','Years left','Deposits received','Remaining lease value'],
+  K.map(k=>{const p=P[k];return [`<span class="dot" style="background:${COL[k]}"></span>${p.name}`,p.tenant,M(p.monthly),M(-p.mort),M(p.net),M(p.annual),M(-p.mortAnn),M(p.netAnn),{v:ESC(p),d:p.pct},D8(p.next&&p.next.date),M(p.next&&p.next.monthly),D8(p.leaseEnd),N(p.yearsLeft),M(p.received),M(p.remaining)]}),
   ['TOTAL','',M(T.monthly),M(-T.mort),M(T.net),M(T.annual),M(-T.mortAnn),M(T.netAnn),'','—','—','—','',M(T.received),M(T.remaining)]);
  ytab('tHist',D.years,'byYear','debtYear','netYear');ytab('tProj',D.pyears,'contractYear','contractDebt','contractNet');
  const dep=K.flatMap(k=>P[k].deps.map(r=>[D8(r[0]),P[k].name,r[1],M(r[2])])).sort((a,b)=>b[0].d-a[0].d);
  tbl('tDepA',['Date','Property','Payer','Amount'],dep,['TOTAL','','',M(T.received)]);}
-function ytab(id,Ys,G,Dk,Nk){const K=D.keys,P=D.props,h=['Year'];K.forEach(k=>{h.push(P[k].short+' rent');if(P[k].mort)h.push(P[k].short+' mortgage',P[k].short+' net')});h.push('Total rent','Total mortgage','Total net cash flow');
+function ytab(id,Ys,G,Dk,Nk){const K=D.keys,P=D.props,h=['Year'];K.forEach(k=>{h.push(P[k].short+' rent');if(P[k].mort)h.push(P[k].short+' '+CL(P[k]),P[k].short+' net')});h.push('Total rent','Total mortgage / expenses','Total net cash flow');
  const row=(lab,g,dd,n)=>{const r=[lab];let tg=0,td=0;K.forEach(k=>{r.push(M(g(k)));if(P[k].mort)r.push(M(-(dd(k)||0)),M(n(k)));tg+=g(k)||0;td+=dd(k)||0});r.push(M(r2(tg)),M(-r2(td)),M(r2(tg-td)));return r};
  const S=(k,f)=>sum(Object.values(P[k][f]));
  tbl(id,h,Ys.map(Y=>row(Y,k=>P[k][G][Y],k=>P[k][Dk][Y],k=>P[k][Nk][Y])),row('TOTAL',k=>S(k,G),k=>S(k,Dk),k=>S(k,Nk)));}
 function prop(k){const p=D.props[k];
- document.getElementById('pinfo').innerHTML=`<span><b>${p.addr}</b></span><span>Tenant <b>${p.tenant}</b></span><span>Lease <b>${fd(p.leaseStart)} – ${fd(p.leaseEnd)}</b></span><span>Purchased <b>${fd(p.acq)}</b></span>`;
- document.getElementById('pc').innerHTML=card('Monthly rent',p.monthly,`${p.pct}% increase every ${p.esc.replace(/^every /i,'')}`,'',1)+card('Annual rent',p.annual,`${p.yoc}% yield on ${$(p.price)} cost`,'',1)
-  +card('Mortgage / debt service',p.mort?-p.mort:0,p.mort?`${$(-p.mortAnn)} per year · flat payment`:'No debt on this property')+card('Net cash flow / month',p.net,`${$(p.netAnn)} per year after mortgage`,'',1)
-  +card('Next escalation',p.next?p.next.monthly:null,p.next?`${fd(p.next.date)} · +${$(p.next.inc)}/mo · +${$(p.next.incAnn)}/yr`:'')
-  +card('Lease years remaining',`${p.yearsLeft}`,`Ends ${fd(p.leaseEnd)} · ${p.remMonths} rent months left`,bar(p.elapsed,COL[k]),0,1)
-  +card('Deposits received',p.received,'Since '+fd(p.depFirst))+card('Remaining lease value',p.remaining,'Contract rent from next month to lease end');
+ document.getElementById('pinfo').innerHTML=`<span><b>${p.addr}</b></span><span>Tenant <b>${p.tenant}</b></span><span>Lease <b>${fd(p.leaseStart)} – ${p.leaseEnd?fd(p.leaseEnd):'end unknown'}</b></span>${p.acq?`<span>Purchased <b>${fd(p.acq)}</b></span>`:''}${p.mort&&CL(p)=='expenses'?'<span>No debt</span>':''}`;
+ document.getElementById('pc').innerHTML=card('Monthly rent',p.monthly,p.pct?`${p.pct}% increase every ${p.esc.replace(/^every /i,'')}`:'Escalation unknown','',1)+card('Annual rent',p.annual,p.price?`${p.yoc}% yield on ${$(p.price)} cost`:'Purchase cost not on file','',1)
+  +(CL(p)=='expenses'?card('Expenses',-p.mort,`${$(-p.mortAnn)} per year · estimate · no debt`):card('Mortgage / debt service',p.mort?-p.mort:0,p.mort?`${$(-p.mortAnn)} per year · flat payment`:'No debt on this property'))+card('Net cash flow / month',p.net,`${$(p.netAnn)} per year after ${CL(p)}`,'',1)
+  +card('Next escalation',p.next?p.next.monthly:null,p.next?`${fd(p.next.date)} · +${$(p.next.inc)}/mo · +${$(p.next.incAnn)}/yr`:p.pct?'':'Unknown')
+  +card('Lease years remaining',p.yearsLeft==null?'Unknown':`${p.yearsLeft}`,p.leaseEnd?`Ends ${fd(p.leaseEnd)} · ${p.remMonths} rent months left`:'Lease term not on file',bar(p.elapsed,COL[k]),0,1)
+  +card('Deposits received',p.received,p.depFirst?'Since '+fd(p.depFirst):'No deposits on file · rent shown from schedule')+card('Remaining lease value',p.remaining,p.leaseEnd?'Contract rent from next month to lease end':'Unknown · lease term not on file');
  const S=p.sched,lyr=k=='popeyes'?'Lease year':'Year';
  stacked('cSch',S.map(r=>({label:r[1].slice(0,4),vals:{[k]:r[3]}})),[k],COL,{[k]:'Annual rent'});
- tbl('tSch',[lyr,'Effective','Monthly rent','Mortgage / mo','Net / mo','Annual rent','Annual increase','Annual mortgage','Annual net cash flow'],S.map(r=>[{v:r[0],d:Date.parse(r[1])},D8(r[1]),M(r[2]),M(r[5]?-p.mort:0),M(r[5]?r2(r[2]-p.mort):r[2]),M(r[3]),M(r[4]),M(-r[5]),M(r[6])]),['TOTAL','—','','','',M(sum(S.map(r=>r[3]))),'',M(-sum(S.map(r=>r[5]))),M(sum(S.map(r=>r[6])))],i=>i==p.curIdx?'cur':i<p.curIdx?'dim':'');
- const Y=Object.keys(p.byYear);tbl('tPY',['Year','Rent','Mortgage','Net cash flow'],Y.map(y=>[y,M(p.byYear[y]),M(-p.debtYear[y]),M(p.netYear[y])]),['TOTAL',M(p.allIncome),M(-p.allDebt),M(p.allNet)]);
+ tbl('tSch',[lyr,'Effective','Monthly rent',CL(p)=='expenses'?'Expenses / mo':'Mortgage / mo','Net / mo','Annual rent','Annual increase',CL(p)=='expenses'?'Annual expenses':'Annual mortgage','Annual net cash flow'],S.map(r=>[{v:r[0],d:Date.parse(r[1])},D8(r[1]),M(r[2]),M(r[5]?-p.mort:0),M(r[5]?r2(r[2]-p.mort):r[2]),M(r[3]),M(r[4]),M(-r[5]),M(r[6])]),['TOTAL','—','','','',M(sum(S.map(r=>r[3]))),'',M(-sum(S.map(r=>r[5]))),M(sum(S.map(r=>r[6])))],i=>i==p.curIdx?'cur':i<p.curIdx?'dim':'');
+ const Y=Object.keys(p.byYear);tbl('tPY',['Year','Rent',CL(p)=='expenses'?'Expenses':'Mortgage','Net cash flow'],Y.map(y=>[y,M(p.byYear[y]),M(-p.debtYear[y]),M(p.netYear[y])]),['TOTAL',M(p.allIncome),M(-p.allDebt),M(p.allNet)]);
  tbl('tDep',['Date','Payer','Amount'],p.deps.slice().reverse().map(r=>[D8(r[0]),r[1],M(r[2])]),['TOTAL','',M(p.received)]);}
 function countUp(el){const t=el.textContent.trim();const m=t.match(/^(-?\$?)([\d,]+(?:\.\d+)?)(%|x)?$/);if(!m||RM)return;const fin=parseFloat(m[2].replace(/,/g,''));const dec=(m[2].split('.')[1]||'').length;const fmt=v=>m[1]+v.toLocaleString('en-US',{minimumFractionDigits:dec,maximumFractionDigits:dec})+(m[3]||'');
  const t0=performance.now();el.textContent=fmt(0);(function f(n){const p=Math.min(1,(n-t0)/1200),e=1-Math.pow(1-p,3);el.textContent=p<1?fmt(fin*e):t;if(p<1)requestAnimationFrame(f)})(t0);}
